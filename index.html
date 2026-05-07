@@ -227,15 +227,24 @@ tr:hover td{background:var(--bg)}
 .divider hr{flex:1;border:none;border-top:1px solid var(--border-lt)}
 
 /* print */
+@page{size:A4;margin:14mm 14mm 16mm}
 @media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   body{background:#fff}
   #uploadPage{display:none!important}
+  .sh-modal{display:none!important}
   #reportPage{display:block!important;padding:0;max-width:none}
   .ctrl-bar{display:none!important}
-  .section{break-inside:avoid;border:1px solid var(--border-lt);margin-bottom:10px}
-  .rpt-header{-webkit-print-color-adjust:exact;print-color-adjust:exact;border-radius:0}
-  .sc,.badge,.pill{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .section{break-inside:avoid;border:1px solid var(--border-lt);margin-bottom:10px;
+    box-shadow:none!important}
+  .rpt-header{border-radius:6px}
   .divider{break-before:page;margin-top:0}
+  .tbl-wrap{overflow:visible}
+  table{page-break-inside:auto}
+  tr{page-break-inside:avoid}
+  .lim-grid{grid-template-columns:1fr 1fr}
+  .ch-grid{grid-template-columns:repeat(3,1fr)}
+  .bar-fill{print-color-adjust:exact}
 }
 @media(max-width:600px){
   .up-grid,.ch-grid{grid-template-columns:1fr}
@@ -276,7 +285,7 @@ tr:hover td{background:var(--bg)}
 <div id="reportPage">
   <div class="ctrl-bar">
     <button class="ctrl-btn" onclick="backToUpload()">← 다시 업로드</button>
-    <button class="ctrl-btn" onclick="window.print()">인쇄 / PDF 저장</button>
+    <button class="ctrl-btn" onclick="printPDF()">PDF 다운로드</button>
     <button class="ctrl-btn primary" onclick="openShareModal()">링크 공유</button>
   </div>
   <div id="reportContent"></div>
@@ -327,6 +336,10 @@ setupUpload('successInput', 'successCard', 'successFile', 'success');
 function backToUpload() {
   document.getElementById('reportPage').style.display = 'none';
   document.getElementById('uploadPage').style.display = 'flex';
+}
+
+function printPDF() {
+  window.print();
 }
 
 // ── PARSE ──
