@@ -192,6 +192,35 @@ tr:hover td{background:var(--bg)}
 .lim-arrow{font-size:11px;color:var(--t4);margin:0 3px}
 @media(max-width:600px){.lim-grid{grid-template-columns:1fr}}
 
+/* share modal */
+.sh-modal{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;
+  display:none;align-items:center;justify-content:center}
+.sh-modal.open{display:flex}
+.sh-box{background:var(--card);border-radius:12px;padding:26px 28px;width:420px;max-width:92vw}
+.sh-title{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px}
+.sh-desc{font-size:12px;color:var(--t3);line-height:1.8;margin-bottom:14px}
+.sh-inp{width:100%;border:1px solid var(--border);border-radius:6px;padding:9px 12px;
+  font-size:12px;font-family:monospace;outline:none;color:var(--t1);margin-bottom:4px}
+.sh-inp:focus{border-color:var(--t3)}
+.sh-hint{font-size:10px;color:var(--t4);margin-bottom:14px;line-height:1.6}
+.sh-hint a{color:var(--t3)}
+.sh-result{padding:12px 14px;background:var(--bg);border-radius:8px;
+  border:1px solid var(--border-lt);margin-bottom:6px}
+.sh-result-lbl{font-size:10px;color:var(--t4);letter-spacing:.3px;margin-bottom:4px}
+.sh-result-url{font-size:12px;color:var(--t2);word-break:break-all;line-height:1.6}
+.sh-result-url a{color:var(--t1);font-weight:600;text-decoration:none}
+.sh-note{font-size:10px;color:var(--t4);text-align:center;line-height:1.7}
+.sh-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.sh-btn{border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:var(--card);color:var(--t2);transition:.15s}
+.sh-btn:hover{background:var(--bg)}
+.sh-btn.p{background:var(--t1);color:#fff;border-color:var(--t1)}
+.sh-btn.p:hover{opacity:.85}
+.sh-btn:disabled{opacity:.35;cursor:not-allowed}
+.sh-status{font-size:12px;color:var(--t3);padding:8px 0;text-align:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;animation:spin .7s linear infinite}
+
 /* part divider */
 .divider{display:flex;align-items:center;gap:12px;margin:22px 0 14px}
 .divider h2{font-size:14px;font-weight:700;white-space:nowrap;color:var(--t2)}
@@ -247,9 +276,15 @@ tr:hover td{background:var(--bg)}
 <div id="reportPage">
   <div class="ctrl-bar">
     <button class="ctrl-btn" onclick="backToUpload()">← 다시 업로드</button>
-    <button class="ctrl-btn primary" onclick="window.print()">인쇄 / PDF 저장</button>
+    <button class="ctrl-btn" onclick="window.print()">인쇄 / PDF 저장</button>
+    <button class="ctrl-btn primary" onclick="openShareModal()">링크 공유</button>
   </div>
   <div id="reportContent"></div>
+</div>
+
+<!-- Share Modal -->
+<div class="sh-modal" id="shModal" onclick="if(event.target===this)closeShareModal()">
+  <div class="sh-box" id="shBox"></div>
 </div>
 
 <script>
@@ -612,6 +647,139 @@ function secSuccessTop(d) {
       </div>
     </div>
   </div>`;
+}
+
+// ── SHARE / PUBLISH ──
+const GH_REPO = 'HWANGSOMYEONG/kpi-report-generator';
+const GH_PAGES = 'https://hwangsomyeong.github.io/kpi-report-generator';
+
+function openShareModal() {
+  const token = localStorage.getItem('gh_pat') || '';
+  renderModal(token ? 'confirm' : 'token');
+  document.getElementById('shModal').classList.add('open');
+}
+function closeShareModal() {
+  document.getElementById('shModal').classList.remove('open');
+}
+
+function renderModal(stage, data) {
+  const box = document.getElementById('shBox');
+  if (stage === 'token') {
+    box.innerHTML = `
+      <div class="sh-title">GitHub 토큰 설정</div>
+      <div class="sh-desc">보고서를 링크로 공유하려면 GitHub Personal Access Token이 필요합니다. 한 번만 입력하면 이후 자동으로 사용됩니다.</div>
+      <input class="sh-inp" id="shTokInp" type="password" placeholder="ghp_xxxxxxxxxxxxxxxx">
+      <div class="sh-hint">
+        <a href="https://github.com/settings/tokens/new?scopes=public_repo&description=KPI+보고서+생성기" target="_blank">토큰 발급 바로가기</a> →
+        Expiration 설정 후 <strong>public_repo</strong> 스코프 체크 → Generate
+      </div>
+      <div class="sh-btns">
+        <button class="sh-btn" onclick="closeShareModal()">취소</button>
+        <button class="sh-btn p" onclick="saveToken()">저장 후 공유</button>
+      </div>`;
+  } else if (stage === 'confirm') {
+    box.innerHTML = `
+      <div class="sh-title">보고서 링크 생성</div>
+      <div class="sh-desc">보고서를 GitHub에 저장하고 고정 링크를 생성합니다.</div>
+      <div class="sh-btns">
+        <button class="sh-btn" onclick="closeShareModal()">취소</button>
+        <button class="sh-btn" style="font-size:11px;color:var(--t4)" onclick="localStorage.removeItem('gh_pat');renderModal('token')">토큰 재설정</button>
+        <button class="sh-btn p" onclick="publishReport()">링크 생성</button>
+      </div>`;
+  } else if (stage === 'loading') {
+    box.innerHTML = `
+      <div class="sh-title">보고서 저장 중</div>
+      <div class="sh-status"><span class="spin">↻</span>  GitHub에 업로드하는 중입니다...</div>`;
+  } else if (stage === 'done') {
+    box.innerHTML = `
+      <div class="sh-title">링크 생성 완료</div>
+      <div class="sh-result">
+        <div class="sh-result-lbl">보고서 URL</div>
+        <div class="sh-result-url"><a href="${data.url}" target="_blank">${data.url}</a></div>
+      </div>
+      <div class="sh-note">GitHub Pages 배포에 1~2분 소요됩니다.<br>그 전에 열면 404가 뜰 수 있어요.</div>
+      <div class="sh-btns">
+        <button class="sh-btn" onclick="closeShareModal()">닫기</button>
+        <button class="sh-btn p" onclick="navigator.clipboard.writeText('${data.url}').then(()=>this.textContent='복사됨!')">URL 복사</button>
+      </div>`;
+  } else if (stage === 'error') {
+    box.innerHTML = `
+      <div class="sh-title">오류 발생</div>
+      <div class="sh-desc" style="color:var(--rose-tx)">${data.msg}</div>
+      <div class="sh-btns">
+        <button class="sh-btn" onclick="closeShareModal()">닫기</button>
+        <button class="sh-btn p" onclick="publishReport()">다시 시도</button>
+      </div>`;
+  }
+}
+
+function saveToken() {
+  const tok = document.getElementById('shTokInp').value.trim();
+  if (!tok) return;
+  localStorage.setItem('gh_pat', tok);
+  publishReport();
+}
+
+async function publishReport() {
+  const token = localStorage.getItem('gh_pat');
+  if (!token) { renderModal('token'); return; }
+
+  renderModal('loading');
+
+  try {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const fname = `reports/${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.html`;
+    const html  = makeStandaloneHtml();
+    const b64   = toB64(html);
+
+    const res = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${fname}`, {
+      method: 'PUT',
+      headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: `보고서 추가: ${fname}`, content: b64 }),
+    });
+
+    if (res.status === 401) {
+      localStorage.removeItem('gh_pat');
+      renderModal('error', { msg: '토큰이 유효하지 않습니다. 토큰을 다시 입력해주세요.' });
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const url = `${GH_PAGES}/${fname}`;
+    renderModal('done', { url });
+  } catch (e) {
+    renderModal('error', { msg: `업로드 실패: ${e.message}` });
+  }
+}
+
+function toB64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin);
+}
+
+function makeStandaloneHtml() {
+  const css     = document.querySelector('style').textContent;
+  const content = document.getElementById('reportContent').innerHTML;
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>KPI 보고서</title>
+<style>${css}</style>
+</head>
+<body>
+<div style="max-width:920px;margin:0 auto;padding:28px 20px 64px">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:18px">
+    <a href="${GH_PAGES}/" style="font-size:12px;color:var(--t4);text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px">새 보고서 생성</a>
+  </div>
+  ${content}
+</div>
+</body>
+</html>`;
 }
 
 // ── GENERATE ──
