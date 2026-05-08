@@ -354,7 +354,7 @@ function parseEtal(wb) {
     if (!name || name === '병원명') continue;
     out.push({ name, totalRate:r[2], naewonRate:r[3], jnrRate:r[4], kakaoRate:r[5],
       totalDays:r[7], naewonDays:r[9], jnrDays:r[11], kakaoDays:r[13],
-      lTotal:String(r[16]||''), lNaewon:String(r[17]||''), lJnr:String(r[18]||''), lKakao:String(r[19]||'') });
+      lTotal:String(r[16]||'').trim(), lNaewon:String(r[17]||'').trim(), lJnr:String(r[18]||'').trim(), lKakao:String(r[19]||'').trim() });
   }
   return { period:String(meta[1]||''), updated:String(meta[4]||''), rows:out };
 }
