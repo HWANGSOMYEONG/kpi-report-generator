@@ -394,9 +394,9 @@ function successStats(d) {
   return {total:d.rows.length,act,part,medCRM:median(d.rows.map(r=>r.crm)),medNaewon:median(d.rows.map(r=>r.naewon))};
 }
 function topRisk(d) {
-  const list=d.rows.filter(r=>r.lTotal==='고위험');
-  list.sort((a,b)=>{const dd=(parseFloat(b.totalDays)||0)-(parseFloat(a.totalDays)||0);if(dd)return dd;return(toNum(a.totalRate)??0)-(toNum(b.totalRate)??0);});
-  return {list,n:list.length,total:d.rows.length};
+  const list=d.rows.filter(r=>r.lTotal==='고위험'||r.lTotal==='중위험');
+  list.sort((a,b)=>{const rw={'고위험':2,'중위험':1};const rd=(rw[b.lTotal]||0)-(rw[a.lTotal]||0);if(rd)return rd;const dd=(parseFloat(b.totalDays)||0)-(parseFloat(a.totalDays)||0);if(dd)return dd;return(toNum(a.totalRate)??0)-(toNum(b.totalRate)??0);});
+  return {list,n:list.length,nHigh:d.rows.filter(r=>r.lTotal==='고위험').length,nMid:d.rows.filter(r=>r.lTotal==='중위험').length,total:d.rows.length};
 }
 function topSuccess(d,st) {
   const list=d.rows.filter(r=>r.lActivity==='상위'&&(r.lParticipation==='상위'||r.lParticipation==='최상위'));
@@ -447,18 +447,18 @@ function secEtalStats(d) {
 }
 
 function secEtalTop(d) {
-  const {list,n,total}=topRisk(d);
+  const {list,n,nHigh,nMid,total}=topRisk(d);
   if(!list.length)return'';
   const trs=list.map((h,i)=>`<tr><td class="rank">${i+1}</td><td class="hosp" title="${h.name}">${h.name}</td><td>${rateHtml(h.totalRate)}</td><td>${daysHtml(h.totalDays)}</td><td>${lbdg(h.lTotal)}</td><td>${lbdg(h.lNaewon)}</td><td>${lbdg(h.lJnr)}</td><td>${lbdg(h.lKakao)}</td></tr>`).join('');
   const stp=list.filter(h=>{const r=toNum(h.totalRate);return r!==null&&r<=-99;});
   const dArr=list.map(h=>parseFloat(h.totalDays)).filter(x=>!isNaN(x));
   const avgD=Math.round(avg(dArr)), maxD=dArr.length?Math.max(...dArr):0;
-  const kH=list.filter(h=>h.lKakao==='고위험').length;
-  const jH=list.filter(h=>h.lJnr==='고위험').length;
-  const nH=list.filter(h=>h.lNaewon==='고위험').length;
+  const kH=list.filter(h=>h.lKakao==='고위험'||h.lKakao==='중위험').length;
+  const jH=list.filter(h=>h.lJnr==='고위험'||h.lJnr==='중위험').length;
+  const nH=list.filter(h=>h.lNaewon==='고위험'||h.lNaewon==='중위험').length;
   const top=[['카카오톡',kH],['진료톡',jH],['내원관리',nH]].sort((a,b)=>b[1]-a[1])[0];
   return`<div class="section">
-    <div class="section-title"><span class="sec-num">02</span>고위험 병원 리스트<span class="sec-sub">전체 ${total}개 병원 중 ${n}개 · 미발송 기간 순</span></div>
+    <div class="section-title"><span class="sec-num">02</span>고위험·중위험 병원 리스트<span class="sec-sub">전체 ${total}개 병원 중 ${n}개 (고위험 ${nHigh} · 중위험 ${nMid}) · 위험도·미발송 기간 순</span></div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>#</th><th>병원명</th><th>총합 증감률</th><th>미발송</th><th>종합</th><th>내원관리</th><th>진료톡</th><th>카카오톡</th></tr></thead>
       <tbody>${trs}</tbody>
@@ -466,18 +466,19 @@ function secEtalTop(d) {
     <div class="box">
       <div class="box-title">특징 분석</div>
       <div class="box-grid">
-        <div class="box-item"><div class="bi-lbl">고위험 병원 수</div><div class="bi-val">${n}개 병원</div><div class="bi-sub">전체 ${total}개 중 ${(n/total*100).toFixed(1)}%</div></div>
-        <div class="box-item"><div class="bi-lbl">발송 완전 중단</div><div class="bi-val">${stp.length}개</div><div class="bi-sub">${Math.round(stp.length/n*100)}% — 총합 증감률 -100%</div></div>
+        <div class="box-item"><div class="bi-lbl">고위험 병원 수</div><div class="bi-val">${nHigh}개 병원</div><div class="bi-sub">전체 ${total}개 중 ${(nHigh/total*100).toFixed(1)}%</div></div>
+        <div class="box-item"><div class="bi-lbl">중위험 병원 수</div><div class="bi-val">${nMid}개 병원</div><div class="bi-sub">전체 ${total}개 중 ${(nMid/total*100).toFixed(1)}%</div></div>
+        <div class="box-item"><div class="bi-lbl">발송 완전 중단</div><div class="bi-val">${stp.length}개</div><div class="bi-sub">${n?Math.round(stp.length/n*100):0}% — 총합 증감률 -100%</div></div>
         <div class="box-item"><div class="bi-lbl">평균 미발송 기간</div><div class="bi-val">${avgD}일</div><div class="bi-sub">최대 ${maxD}일</div></div>
-        <div class="box-item"><div class="bi-lbl">가장 많이 중단된 채널</div><div class="bi-val">${top[0]}</div><div class="bi-sub">고위험 ${top[1]}개 병원</div></div>
       </div>
     </div>
     <div class="strat">
       <div class="strat-head">이탈 방지 전략</div>
       <div class="strat-body">
-        <p class="strat-intro">고위험 <strong>${n}개 병원</strong> 중 <strong>${stp.length}개</strong>(${Math.round(stp.length/n*100)}%)는 발송이 완전 중단된 상태이며, 평균 미발송 기간은 <strong>${avgD}일</strong>입니다. 즉각 대응이 필요합니다.</p>
-        <div class="act-row"><span class="pill rose">즉시 대응</span><div class="act-text"><strong>고위험 ${n}개 병원</strong> — 이번 주 내 고객성공팀 직접 연락<br>발송 중단 원인 파악(기술 이슈 · 비용 · 운영 문제) → 재활성화 지원 또는 이탈 확정 여부 확인</div></div>
-        <div class="strat-note">채널별 고위험 — 카카오톡 ${kH}개 · 진료톡 ${jH}개 · 내원관리 ${nH}개 → ${top[0]}에서 이탈 위험이 가장 많이 발생, 해당 채널 집중 지원 우선 진행</div>
+        <p class="strat-intro">고위험 <strong>${nHigh}개</strong>, 중위험 <strong>${nMid}개</strong> 총 <strong>${n}개 병원</strong> 중 <strong>${stp.length}개</strong>는 발송이 완전 중단된 상태이며, 평균 미발송 기간은 <strong>${avgD}일</strong>입니다.</p>
+        <div class="act-row"><span class="pill rose">즉시 대응</span><div class="act-text"><strong>고위험 ${nHigh}개 병원</strong> — 이번 주 내 고객성공팀 직접 연락<br>발송 중단 원인 파악(기술 이슈 · 비용 · 운영 문제) → 재활성화 지원 또는 이탈 확정 여부 확인</div></div>
+        <div class="act-row"><span class="pill amber">모니터링</span><div class="act-text"><strong>중위험 ${nMid}개 병원</strong> — 발송량 감소 추이 지속 확인<br>다음 주기에도 지속 시 고위험 전환 가능성 높음 → 선제 개입 권장</div></div>
+        <div class="strat-note">채널별 위험 병원 — 카카오톡 ${kH}개 · 진료톡 ${jH}개 · 내원관리 ${nH}개 → ${top[0]}에서 이탈 위험이 가장 많이 발생, 해당 채널 집중 지원 우선 진행</div>
       </div>
     </div>
   </div>`;
